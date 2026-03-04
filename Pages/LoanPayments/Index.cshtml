@@ -281,12 +281,13 @@ else
           }
 
           function applyLoanFilter() {
-              const loanId = document.getElementById('loanFilter').value;
-              const url = new URL(window.location.href);
-              if (loanId) url.searchParams.set('loanId', loanId);
-              else url.searchParams.delete('loanId');
-              window.location.href = url.toString();
-          }
+                const loanId = document.getElementById('loanFilter').value;
+                const url = new URL(window.location.href);
+                if (loanId) url.searchParams.set('loanId', loanId);
+                else url.searchParams.delete('loanId');
+                // preserve existing period/from/to params
+                window.location.href = url.toString();
+        }
 
          function toggleSettledDate(divId, show) {
               document.getElementById(divId).style.display = show ? 'block' : 'none';
