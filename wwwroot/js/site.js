@@ -23,12 +23,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.filter-btn[data-period]').forEach(btn => {
         btn.addEventListener('click', () => {
             const period = btn.dataset.period;
+
+            if (period === 'custom') {
+                const row = document.getElementById('customRangeRow');
+                if (row) row.style.display = 'flex';
+                return; // stop — don't navigate
+            }
+
             const url = new URL(window.location.href);
             url.searchParams.set('period', period);
-            if (period !== 'custom') {
-                url.searchParams.delete('from');
-                url.searchParams.delete('to');
-            }
+            url.searchParams.delete('from');
+            url.searchParams.delete('to');
             window.location.href = url.toString();
         });
     });
@@ -39,6 +44,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.filter-btn[data-period]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.period === period);
     });
+
+    if (period === 'custom') {
+        const row = document.getElementById('customRangeRow');
+        if (row) row.style.display = 'flex';
+    }
 
     // Custom date range
     const applyCustom = document.getElementById('applyCustomRange');

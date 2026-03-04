@@ -41,7 +41,7 @@
     <button class="filter-btn" data-period="year">Year</button>
     <button class="filter-btn" data-period="all">All</button>
     <span class="filter-sep">|</span>
-    <button class="filter-btn" data-period="custom" onclick="document.getElementById('customRangeRow').style.display='flex'">Custom</button>
+    <button class="filter-btn" data-period="custom">Custom</button>
     <div style="margin-left:auto">
         <button class="btn btn-primary" onclick="openModal('addLoanModal')">+ Add Loan</button>
     </div>
@@ -73,10 +73,9 @@ else
                     <th>Mobile</th>
                     <th>Amount</th>
                     <th>Given Date</th>
-                    <th>Interest</th>
+                    <th>Interest Due</th>
                     <th>Paid</th>
-                    <th>Total Due</th>
-                    @* <th>Total Due</th> *@
+                    <th>Total Repayable</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -96,17 +95,29 @@ else
                         <td style="font-family:'JetBrains Mono',monospace;font-size:12.5px">@(l.MobileNo ?? "—")</td>
                         <td class="amount-cell">₹@l.Amount.ToString("N2")</td>
                         <td style="font-size:13px">@l.GivenDate.ToString("dd MMM yyyy")</td>
-                        <td>
-                            <div style="font-size:12.5px">₹@l.InterestAmount.ToString("N0") / @l.InterestType</div>
-                            @if (l.InterestPaidDate.HasValue)
+
+                        <!-- Interest Due -->
+                        <td class="amount-cell">
+                            @if (l.IsSettled)
                             {
-                                <div style="font-size:11px;color:var(--muted)">Paid: @l.InterestPaidDate.Value.ToString("dd MMM")</div>
+                                <span style="color:var(--muted)">—</span>
+                            }
+                            else if (l.IsInterestFullyPaid)
+                            {
+                                <span style="color:var(--accent)">₹0.00</span>
+                            }
+                            else
+                            {
+                                <span style="color:var(--accent2)">₹@l.TotalInterestDue.ToString("N2")</span>
                             }
                         </td>
-                        @* <td class="amount-cell" style="color:var(--accent3)">₹@l.TotalRepayable.ToString("N2")</td> *@
+
+                        <!-- Paid -->
                         <td class="amount-cell" style="color:var(--accent)">
                             ₹@l.TotalInterestPaid.ToString("N2")
                         </td>
+
+                        <!-- Total Repayable -->
                         <td class="amount-cell">
                             @if (l.IsSettled)
                             {
@@ -121,6 +132,8 @@ else
                                 <span style="color:var(--accent2)">₹@l.TotalRepayable.ToString("N2")</span>
                             }
                         </td>
+
+                        <!-- Status -->
                         <td>
                             @if (l.IsSettled)
                             {
@@ -131,26 +144,21 @@ else
                                 <span class="badge badge-yellow">⏳ Active</span>
                             }
                         </td>
+
+                        <!-- Actions -->
                         <td>
                             <div style="display:flex;gap:6px;flex-wrap:wrap">
                                 <button class="btn btn-outline btn-sm"
-                                    onclick="openEditLoanModal(@l.LoanId,'@l.FullName', '@l.Address','@l.MobileNo','@l.Amount','@l.GivenDate.ToString("yyyy-MM-dd")','@l.InterestType','@l.InterestAmount','@l.InterestPaidDate?.ToString("yyyy-MM-dd")','@l.Notes')">
+                                        onclick="openEditLoanModal(@l.LoanId,'@l.FullName.Replace("'", "\\'")', '@l.Address','@l.MobileNo','@l.Amount','@l.GivenDate.ToString("yyyy-MM-dd")','@l.InterestType','@l.InterestAmount','@l.InterestPercentage','@l.InterestPaidDate?.ToString("yyyy-MM-dd")','@l.Notes')">
                                     ✏️
                                 </button>
-                                @if (!l.IsSettled)
-                                {
-                                    <form method="post" asp-page-handler="Settle" style="display:inline">
-                                        <input type="hidden" name="id" value="@l.LoanId" />
-                                        @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-sm" style="background:rgba(0,229,160,0.1);color:var(--accent);border:1px solid rgba(0,229,160,0.3)"
-                                            onclick="return confirm('Mark this loan as settled?')">✅</button>
-                                    </form>
-                                }
                                 <form method="post" asp-page-handler="Delete" style="display:inline" id="del-loan-@l.LoanId">
                                     <input type="hidden" name="id" value="@l.LoanId" />
                                     @Html.AntiForgeryToken()
                                     <button type="button" class="btn btn-danger btn-sm"
-                                        onclick="confirmDelete('del-loan-@l.LoanId')">🗑️</button>
+                                            onclick="confirmDelete('del-loan-@l.LoanId')">
+                                        🗑️
+                                    </button>
                                 </form>
                             </div>
                         </td>

@@ -32,8 +32,7 @@
     <button class="filter-btn" data-period="year">Year</button>
     <button class="filter-btn" data-period="all">All</button>
     <span class="filter-sep">|</span>
-    <button class="filter-btn" data-period="custom"
-            onclick="document.getElementById('customRangeRow').style.display='flex'">
+    <button class="filter-btn" data-period="custom">
         Custom
     </button>
     <div style="margin-left:auto">
@@ -103,7 +102,7 @@ else
                             </span>
                         </td>
                         <td style="color:var(--muted);font-size:12.5px">@(p.Notes ?? "—")</td>
-                        
+
                         <td>
                             @if (p.IsSettled)
                             {
@@ -113,7 +112,7 @@ else
                             {
                                 <span class="badge badge-yellow">⏳ Active</span>
                             }
-                        </td>                        
+                        </td>
                         <td>
                             @if (p.LoanIsSettled)
                             {

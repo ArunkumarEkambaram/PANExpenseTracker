@@ -14,7 +14,7 @@
     <button class="filter-btn" data-period="year">This Year</button>
     <button class="filter-btn" data-period="all">All Time</button>
     <span class="filter-sep">|</span>
-    <button class="filter-btn" data-period="custom" onclick="document.getElementById('customRangeRow').style.display='flex'">Custom Range</button>
+    <button class="filter-btn" data-period="custom">Custom Range</button>
 </div>
 <div id="customRangeRow" style="display:none;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
     <input type="date" id="customFrom" value="@Model.Filter.From?.ToString("yyyy-MM-dd")" style="width:160px">

@@ -21,35 +21,36 @@ public class Loan
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    public decimal TotalInterestDue
+    public decimal TotalAccrued
     {
         get
         {
-            if (IsSettled) return 0;
-            var months = (int)((DateTime.Today - GivenDate).TotalDays / 30.44);
-            if (months <= 0) return 0;
-            var accrued = InterestType == "Monthly"
-                ? InterestAmount * months
-                : InterestAmount * Math.Ceiling(months / 12.0m);
-            return Math.Max(0, accrued - TotalInterestPaid);
+            var totalMonths = (DateTime.Today - GivenDate).TotalDays / 30.44;
+            if (totalMonths <= 0) return 0;
+
+            if (InterestType == "Monthly")
+            {
+                // Only full completed months — no pro-rata
+                var fullMonths = (int)Math.Floor(totalMonths);
+                return InterestAmount * fullMonths;
+            }
+            else // Yearly
+            {
+                // Full years + pro-rata remaining months
+                var fullYears = Math.Floor(totalMonths / 12);
+                var remainingMonths = totalMonths - (fullYears * 12);
+                return InterestAmount * (decimal)(fullYears + (remainingMonths / 12));
+            }
         }
     }
 
-    public decimal TotalAccrued  // raw accrued before subtracting payments
-    {
-        get
-        {
-            var months = (int)((DateTime.Today - GivenDate).TotalDays / 30.44);
-            if (months <= 0) return 0;
-            return InterestType == "Monthly"
-                ? InterestAmount * months
-                : InterestAmount * Math.Ceiling(months / 12.0m);
-        }
-    }
+    public decimal TotalInterestDue => IsSettled ? 0 : Math.Max(0, TotalAccrued - TotalInterestPaid);
 
-    public bool IsInterestFullyPaid => TotalInterestPaid >= TotalAccrued && TotalAccrued > 0;
+    public bool IsInterestFullyPaid => !IsSettled && TotalInterestPaid >= TotalAccrued && TotalAccrued > 0;
 
-    public decimal TotalRepayable => Amount + TotalInterestDue;    
+    public decimal TotalRepayable => Amount + TotalInterestDue;
+
+   
 }
 
 public class LoanInterestPayment
