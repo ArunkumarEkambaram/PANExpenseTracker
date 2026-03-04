@@ -33,7 +33,9 @@
     <button class="filter-btn" data-period="all">All</button>
     <span class="filter-sep">|</span>
     <button class="filter-btn" data-period="custom"
-        onclick="document.getElementById('customRangeRow').style.display='flex'">Custom</button>
+            onclick="document.getElementById('customRangeRow').style.display='flex'">
+        Custom
+    </button>
     <div style="margin-left:auto">
         <button class="btn btn-primary" onclick="openModal('addPayModal')">+ Record Payment</button>
     </div>
@@ -85,36 +87,55 @@ else
                     <th>Mode</th>
                     <th>Notes</th>
                     <th>Actions</th>
+                    <th>Status</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var p in Model.Payments)
                 {
                     <tr>
-                        <td style="font-family:'JetBrains Mono',monospace;font-size:12.5px">
-                            @p.PaymentDate.ToString("dd MMM yyyy")
-                        </td>
+                        <td>@p.PaymentDate.ToString("dd MMM yyyy")</td>
                         <td style="font-weight:600">@p.BorrowerName</td>
                         <td class="amount-cell" style="color:var(--accent)">₹@p.AmountPaid.ToString("N2")</td>
                         <td>
-                            <span class="badge @(p.PaymentMode=="Cash"?"badge-green":p.PaymentMode=="UPI"?"badge-blue":"badge-yellow")">
+                            <span class="badge @(p.PaymentMode == "Cash" ? "badge-green" : p.PaymentMode == "UPI" ? "badge-blue" : "badge-yellow")">
                                 @p.PaymentMode
                             </span>
                         </td>
                         <td style="color:var(--muted);font-size:12.5px">@(p.Notes ?? "—")</td>
+                        
                         <td>
-                            <div style="display:flex;gap:6px">
-                                <button class="btn btn-outline btn-sm"
-                                    onclick="openEditPayModal(@p.PaymentId,@p.LoanId,'@p.PaymentDate.ToString("yyyy-MM-dd")',@p.AmountPaid,'@p.PaymentMode','@p.Notes?.Replace("'","\\'")' )">
-                                    ✏️
-                                </button>
-                                <form method="post" asp-page-handler="Delete" id="del-pay-@p.PaymentId" style="display:inline">
-                                    <input type="hidden" name="id" value="@p.PaymentId" />
-                                    @Html.AntiForgeryToken()
-                                    <button type="button" class="btn btn-danger btn-sm"
-                                        onclick="confirmDelete('del-pay-@p.PaymentId')">🗑️</button>
-                                </form>
-                            </div>
+                            @if (p.IsSettled)
+                            {
+                                <span class="badge badge-green">✅ Settled @p.SettledDate?.ToString("dd MMM yyyy")</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-yellow">⏳ Active</span>
+                            }
+                        </td>                        
+                        <td>
+                            @if (p.LoanIsSettled)
+                            {
+                                <span style="font-size:11px;color:var(--muted)">Locked</span>
+                            }
+                            else
+                            {
+                                <div style="display:flex;gap:6px">
+                                    <button class="btn btn-outline btn-sm"
+                                            onclick="openEditPayModal(@p.PaymentId,@p.LoanId,'@p.PaymentDate.ToString("yyyy-MM-dd")',@p.AmountPaid,'@p.PaymentMode','@p.Notes?.Replace("'", "\\'")',@p.IsSettled.ToString().ToLower(),'@p.SettledDate?.ToString("yyyy-MM-dd")')">
+                                        ✏️
+                                    </button>
+                                    <form method="post" asp-page-handler="Delete" id="del-pay-@p.PaymentId" style="display:inline">
+                                        <input type="hidden" name="id" value="@p.PaymentId" />
+                                        @Html.AntiForgeryToken()
+                                        <button type="button" class="btn btn-danger btn-sm"
+                                                onclick="confirmDelete('del-pay-@p.PaymentId')">
+                                            🗑️
+                                        </button>
+                                    </form>
+                                </div>
+                            }
                         </td>
                     </tr>
                 }
@@ -140,8 +161,8 @@ else
                         @foreach (var l in Model.ActiveLoans.Where(l => !l.IsSettled))
                         {
                             <option value="@l.LoanId"
-                                data-interest="@l.InterestAmount"
-                                data-type="@l.InterestType">
+                                    data-interest="@l.InterestAmount"
+                                    data-type="@l.InterestType">
                                 @l.FullName — ₹@l.Amount.ToString("N0") (@l.InterestType)
                             </option>
                         }
@@ -162,6 +183,17 @@ else
                         <option value="UPI">UPI</option>
                         <option value="Bank">Bank</option>
                     </select>
+                </div>
+                <div class="form-group span2">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" name="isSettled" id="addIsSettled" value="true"
+                               onchange="toggleSettledDate('addSettledDate', this.checked)" style="width:auto" />
+                        Mark this loan as Fully Settled
+                    </label>
+                </div>
+                <div class="form-group" id="addSettledDate" style="display:none;">
+                    <label>Settled Date *</label>
+                    <input name="settledDate" type="date" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
                 </div>
                 <div class="form-group">
                     <label>Notes</label>
@@ -193,8 +225,8 @@ else
                         @foreach (var l in Model.ActiveLoans)
                         {
                             <option value="@l.LoanId"
-                                data-interest="@l.InterestAmount"
-                                data-type="@l.InterestType">
+                                    data-interest="@l.InterestAmount"
+                                    data-type="@l.InterestType">
                                 @l.FullName — ₹@l.Amount.ToString("N0") (@l.InterestType)
                             </option>
                         }
@@ -216,6 +248,17 @@ else
                         <option value="Bank">Bank</option>
                     </select>
                 </div>
+                <div class="form-group span2">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" name="isSettled" id="editIsSettled" value="true"
+                               onchange="toggleSettledDate('editSettledDate', this.checked)" style="width:auto" />
+                        Mark this loan as Fully Settled
+                    </label>
+                </div>
+                <div class="form-group" id="editSettledDate" style="display:none;">
+                    <label>Settled Date *</label>
+                    <input name="settledDate" id="editSettledDateInput" type="date" />
+                </div>
                 <div class="form-group">
                     <label>Notes</label>
                     <input name="notes" id="editPayNotes" />
@@ -230,30 +273,40 @@ else
 </div>
 
 @section Scripts {
-<script>
-function fillInterestAmount() {
-    const sel = document.getElementById('addLoanSelect');
-    const opt = sel.options[sel.selectedIndex];
-    const interest = opt?.dataset.interest || '';
-    document.getElementById('addAmountPaid').value = interest ? parseFloat(interest).toFixed(2) : '';
-}
+    <script>
+          function fillInterestAmount() {
+              const sel = document.getElementById('addLoanSelect');
+              const opt = sel.options[sel.selectedIndex];
+              const interest = opt?.dataset.interest || '';
+              document.getElementById('addAmountPaid').value = interest ? parseFloat(interest).toFixed(2) : '';
+          }
 
-function applyLoanFilter() {
-    const loanId = document.getElementById('loanFilter').value;
-    const url = new URL(window.location.href);
-    if (loanId) url.searchParams.set('loanId', loanId);
-    else url.searchParams.delete('loanId');
-    window.location.href = url.toString();
-}
+          function applyLoanFilter() {
+              const loanId = document.getElementById('loanFilter').value;
+              const url = new URL(window.location.href);
+              if (loanId) url.searchParams.set('loanId', loanId);
+              else url.searchParams.delete('loanId');
+              window.location.href = url.toString();
+          }
 
-function openEditPayModal(id, loanId, date, amount, mode, notes) {
-    document.getElementById('editPayId').value = id;
-    document.getElementById('editLoanSelect').value = loanId;
-    document.getElementById('editPayDate').value = date;
-    document.getElementById('editAmountPaid').value = amount;
-    document.getElementById('editPayMode').value = mode;
-    document.getElementById('editPayNotes').value = notes || '';
-    openModal('editPayModal');
-}
-</script>
+         function toggleSettledDate(divId, show) {
+              document.getElementById(divId).style.display = show ? 'block' : 'none';
+         }
+
+        function openEditPayModal(id, loanId, date, amount, mode, notes, isSettled, settledDate) {
+             document.getElementById('editPayId').value = id;
+             document.getElementById('editLoanSelect').value = loanId;
+             document.getElementById('editPayDate').value = date;
+             document.getElementById('editAmountPaid').value = amount;
+             document.getElementById('editPayMode').value = mode;
+             document.getElementById('editPayNotes').value = notes || '';
+             const settledChk = document.getElementById('editIsSettled');
+             settledChk.checked = isSettled;
+             toggleSettledDate('editSettledDate', isSettled);
+             if (isSettled && settledDate) {
+                 document.getElementById('editSettledDateInput').value = settledDate;
+             }
+             openModal('editPayModal');
+         }
+    </script>
 }

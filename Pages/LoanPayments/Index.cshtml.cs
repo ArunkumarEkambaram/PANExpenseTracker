@@ -33,7 +33,8 @@ public class IndexModel : PageModel
     }
 
     public async Task<IActionResult> OnPostAddAsync(int loanId, DateTime paymentDate,
-        decimal amountPaid, string paymentMode, string? notes)
+    decimal amountPaid, string paymentMode, string? notes,
+    bool isSettled = false, DateTime? settledDate = null)
     {
         await _repo.AddAsync(new LoanInterestPayment
         {
@@ -41,14 +42,17 @@ public class IndexModel : PageModel
             PaymentDate = paymentDate,
             AmountPaid = amountPaid,
             PaymentMode = paymentMode,
-            Notes = notes
+            Notes = notes,
+            IsSettled = isSettled,
+            SettledDate = isSettled ? settledDate : null
         });
-        SuccessMessage = "Payment recorded successfully.";
+        SuccessMessage = isSettled ? "Payment recorded and loan marked as Settled." : "Payment recorded successfully.";
         return RedirectToPage();
     }
 
     public async Task<IActionResult> OnPostEditAsync(int paymentId, int loanId,
-        DateTime paymentDate, decimal amountPaid, string paymentMode, string? notes)
+    DateTime paymentDate, decimal amountPaid, string paymentMode, string? notes,
+    bool isSettled = false, DateTime? settledDate = null)
     {
         await _repo.UpdateAsync(new LoanInterestPayment
         {
@@ -57,7 +61,9 @@ public class IndexModel : PageModel
             PaymentDate = paymentDate,
             AmountPaid = amountPaid,
             PaymentMode = paymentMode,
-            Notes = notes
+            Notes = notes,
+            IsSettled = isSettled,
+            SettledDate = isSettled ? settledDate : null
         });
         SuccessMessage = "Payment updated.";
         return RedirectToPage();

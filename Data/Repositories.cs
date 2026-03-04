@@ -27,18 +27,25 @@ public class LoanRepository : ILoanRepository
         var (from, to) = filter.GetRange();
         using var db = new SqlConnection(_conn);
         return await db.QueryAsync<Loan>(
-            @"SELECT * FROM Loans
-              WHERE IsDeleted=0
-                AND CAST(GivenDate AS DATE) BETWEEN @From AND @To
-              ORDER BY GivenDate DESC",
-            new { From = from, To = to });
+            @"SELECT l.*,
+                ISNULL((SELECT SUM(AmountPaid) FROM LoanInterestPayments
+                        WHERE LoanId = l.LoanId AND IsDeleted = 0), 0) AS TotalInterestPaid
+              FROM Loans l
+              WHERE l.IsDeleted = 0
+                AND CAST(l.GivenDate AS DATE) BETWEEN @From AND @To
+              ORDER BY l.GivenDate DESC",
+    new { From = from, To = to });
     }
 
     public async Task<Loan?> GetByIdAsync(int id)
     {
         using var db = new SqlConnection(_conn);
         return await db.QueryFirstOrDefaultAsync<Loan>(
-            "SELECT * FROM Loans WHERE LoanId=@id AND IsDeleted=0", new { id });
+            @"SELECT l.*,
+                ISNULL((SELECT SUM(AmountPaid) FROM LoanInterestPayments
+                        WHERE LoanId = l.LoanId AND IsDeleted = 0), 0) AS TotalInterestPaid
+              FROM Loans l
+              WHERE l.LoanId = @id AND l.IsDeleted = 0", new { id });
     }
 
     public async Task<int> AddAsync(Loan loan)
@@ -419,13 +426,14 @@ public class LoanInterestPaymentRepository : ILoanInterestPaymentRepository
         var (from, to) = filter.GetRange();
         using var db = new SqlConnection(_conn);
         return await db.QueryAsync<LoanInterestPayment>(
-            @"SELECT p.*, l.FullName AS BorrowerName, l.InterestAmount AS LoanInterestAmount, l.InterestType AS LoanInterestType
-              FROM LoanInterestPayments p
-              INNER JOIN Loans l ON l.LoanId = p.LoanId
-              WHERE p.IsDeleted = 0
-                AND CAST(p.PaymentDate AS DATE) BETWEEN @From AND @To
-                AND (@LoanId IS NULL OR p.LoanId = @LoanId)
-              ORDER BY p.PaymentDate DESC",
+           @"SELECT p.*, l.FullName AS BorrowerName, l.InterestAmount AS LoanInterestAmount,
+            l.InterestType AS LoanInterestType, l.IsSettled AS LoanIsSettled
+            FROM LoanInterestPayments p
+            INNER JOIN Loans l ON l.LoanId = p.LoanId
+            WHERE p.IsDeleted = 0
+            AND CAST(p.PaymentDate AS DATE) BETWEEN @From AND @To
+            AND (@LoanId IS NULL OR p.LoanId = @LoanId)
+            ORDER BY p.PaymentDate DESC",
             new { From = from, To = to, LoanId = loanId });
     }
 
@@ -433,24 +441,31 @@ public class LoanInterestPaymentRepository : ILoanInterestPaymentRepository
     {
         using var db = new SqlConnection(_conn);
         return await db.QueryFirstOrDefaultAsync<LoanInterestPayment>(
-            @"SELECT p.*, l.FullName AS BorrowerName, l.InterestAmount AS LoanInterestAmount, l.InterestType AS LoanInterestType
-              FROM LoanInterestPayments p
-              INNER JOIN Loans l ON l.LoanId = p.LoanId
-              WHERE p.PaymentId = @id AND p.IsDeleted = 0", new { id });
+            @"SELECT p.*, l.FullName AS BorrowerName, l.InterestAmount AS LoanInterestAmount,
+                l.InterestType AS LoanInterestType, l.IsSettled AS LoanIsSettled
+                FROM LoanInterestPayments p
+                INNER JOIN Loans l ON l.LoanId = p.LoanId
+                WHERE p.PaymentId = @id AND p.IsDeleted = 0", new { id });
     }
 
     public async Task<int> AddAsync(LoanInterestPayment payment)
     {
         using var db = new SqlConnection(_conn);
         var paymentId = await db.ExecuteScalarAsync<int>(
-            @"INSERT INTO LoanInterestPayments(LoanId,PaymentDate,AmountPaid,PaymentMode,Notes)
-              VALUES(@LoanId,@PaymentDate,@AmountPaid,@PaymentMode,@Notes);
-              SELECT SCOPE_IDENTITY();", payment);
+            @"INSERT INTO LoanInterestPayments(LoanId,PaymentDate,AmountPaid,PaymentMode,Notes,IsSettled,SettledDate)
+          VALUES(@LoanId,@PaymentDate,@AmountPaid,@PaymentMode,@Notes,@IsSettled,@SettledDate);
+          SELECT SCOPE_IDENTITY();", payment);
 
-        // Auto-update InterestPaidDate on the Loan
+        // Always update InterestPaidDate
         await db.ExecuteAsync(
             "UPDATE Loans SET InterestPaidDate=@PaymentDate WHERE LoanId=@LoanId",
             new { payment.PaymentDate, payment.LoanId });
+
+        // If settled, mark the loan as settled too
+        if (payment.IsSettled)
+            await db.ExecuteAsync(
+                "UPDATE Loans SET IsSettled=1, SettledDate=@SettledDate WHERE LoanId=@LoanId",
+                new { payment.SettledDate, payment.LoanId });
 
         return paymentId;
     }
@@ -460,16 +475,32 @@ public class LoanInterestPaymentRepository : ILoanInterestPaymentRepository
         using var db = new SqlConnection(_conn);
         await db.ExecuteAsync(
             @"UPDATE LoanInterestPayments SET
-                LoanId=@LoanId, PaymentDate=@PaymentDate,
-                AmountPaid=@AmountPaid, PaymentMode=@PaymentMode, Notes=@Notes
-              WHERE PaymentId=@PaymentId", payment);
+            LoanId=@LoanId, PaymentDate=@PaymentDate, AmountPaid=@AmountPaid,
+            PaymentMode=@PaymentMode, Notes=@Notes,
+            IsSettled=@IsSettled, SettledDate=@SettledDate
+          WHERE PaymentId=@PaymentId", payment);
 
-        // Re-sync InterestPaidDate to latest payment date for this loan
+        // Re-sync InterestPaidDate
         await db.ExecuteAsync(
             @"UPDATE Loans SET InterestPaidDate=(
-                SELECT MAX(PaymentDate) FROM LoanInterestPayments
-                WHERE LoanId=@LoanId AND IsDeleted=0)
-              WHERE LoanId=@LoanId", new { payment.LoanId });
+            SELECT MAX(PaymentDate) FROM LoanInterestPayments
+            WHERE LoanId=@LoanId AND IsDeleted=0)
+          WHERE LoanId=@LoanId", new { payment.LoanId });
+
+        // Sync settlement status
+        if (payment.IsSettled)
+            await db.ExecuteAsync(
+                "UPDATE Loans SET IsSettled=1, SettledDate=@SettledDate WHERE LoanId=@LoanId",
+                new { payment.SettledDate, payment.LoanId });
+        else
+            // Only un-settle the loan if no other payment has IsSettled=1 for this loan
+            await db.ExecuteAsync(
+                @"UPDATE Loans SET IsSettled=0, SettledDate=NULL
+              WHERE LoanId=@LoanId
+                AND NOT EXISTS (
+                    SELECT 1 FROM LoanInterestPayments
+                    WHERE LoanId=@LoanId AND IsSettled=1 AND IsDeleted=0
+                )", new { payment.LoanId });
     }
 
     public async Task SoftDeleteAsync(int id)

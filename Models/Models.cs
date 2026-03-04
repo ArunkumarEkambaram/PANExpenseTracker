@@ -13,6 +13,7 @@ public class Loan
     public decimal InterestAmount { get; set; }
     public decimal InterestPercentage { get; set; }
     public DateTime? InterestPaidDate { get; set; }
+    public decimal TotalInterestPaid { get; set; }
     public string? Notes { get; set; }
     public bool IsSettled { get; set; }
     public DateTime? SettledDate { get; set; }
@@ -20,7 +21,6 @@ public class Loan
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    // Computed
     public decimal TotalInterestDue
     {
         get
@@ -28,12 +28,28 @@ public class Loan
             if (IsSettled) return 0;
             var months = (int)((DateTime.Today - GivenDate).TotalDays / 30.44);
             if (months <= 0) return 0;
+            var accrued = InterestType == "Monthly"
+                ? InterestAmount * months
+                : InterestAmount * Math.Ceiling(months / 12.0m);
+            return Math.Max(0, accrued - TotalInterestPaid);
+        }
+    }
+
+    public decimal TotalAccrued  // raw accrued before subtracting payments
+    {
+        get
+        {
+            var months = (int)((DateTime.Today - GivenDate).TotalDays / 30.44);
+            if (months <= 0) return 0;
             return InterestType == "Monthly"
                 ? InterestAmount * months
                 : InterestAmount * Math.Ceiling(months / 12.0m);
         }
     }
-    public decimal TotalRepayable => Amount + TotalInterestDue;
+
+    public bool IsInterestFullyPaid => TotalInterestPaid >= TotalAccrued && TotalAccrued > 0;
+
+    public decimal TotalRepayable => Amount + TotalInterestDue;    
 }
 
 public class LoanInterestPayment
@@ -50,6 +66,10 @@ public class LoanInterestPayment
     // For display
     public decimal LoanInterestAmount { get; set; }
     public string LoanInterestType { get; set; } = "";
+    public bool IsSettled { get; set; }
+    public DateTime? SettledDate { get; set; }
+    // For display — whether the parent loan is already settled
+    public bool LoanIsSettled { get; set; }
 }
 
 // ─── EXPENSE CATEGORY ────────────────────────────────────────

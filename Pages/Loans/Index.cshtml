@@ -3,6 +3,7 @@
 @{
     var totalActive = Model.Loans.Where(l => !l.IsSettled).Sum(l => l.Amount);
     var totalInterest = Model.Loans.Where(l => !l.IsSettled).Sum(l => l.TotalInterestDue);
+    var totalPaid = Model.Loans.Sum(l => l.TotalInterestPaid);
 }
 
 @if (TempData["SuccessMessage"] != null)
@@ -24,6 +25,11 @@
     <div class="stat-card blue">
         <div class="stat-label">Interest Accrued</div>
         <div class="stat-value blue">₹@totalInterest.ToString("N2")</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-label">Interest Collected</div>
+        <div class="stat-value green">₹@totalPaid.ToString("N2")</div>
+        <div class="stat-sub">All payments received</div>
     </div>
 </div>
 
@@ -68,7 +74,9 @@ else
                     <th>Amount</th>
                     <th>Given Date</th>
                     <th>Interest</th>
+                    <th>Paid</th>
                     <th>Total Due</th>
+                    @* <th>Total Due</th> *@
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -95,7 +103,24 @@ else
                                 <div style="font-size:11px;color:var(--muted)">Paid: @l.InterestPaidDate.Value.ToString("dd MMM")</div>
                             }
                         </td>
-                        <td class="amount-cell" style="color:var(--accent3)">₹@l.TotalRepayable.ToString("N2")</td>
+                        @* <td class="amount-cell" style="color:var(--accent3)">₹@l.TotalRepayable.ToString("N2")</td> *@
+                        <td class="amount-cell" style="color:var(--accent)">
+                            ₹@l.TotalInterestPaid.ToString("N2")
+                        </td>
+                        <td class="amount-cell">
+                            @if (l.IsSettled)
+                            {
+                                <span style="color:var(--accent)">✅ Settled</span>
+                            }
+                            else if (l.IsInterestFullyPaid)
+                            {
+                                <span style="color:var(--accent)">₹@l.TotalRepayable.ToString("N2")</span>
+                            }
+                            else
+                            {
+                                <span style="color:var(--accent2)">₹@l.TotalRepayable.ToString("N2")</span>
+                            }
+                        </td>
                         <td>
                             @if (l.IsSettled)
                             {

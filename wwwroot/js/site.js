@@ -122,6 +122,9 @@ function calcLoanInterest() {
     }
     const totalDue = amount + totalInterest;
 
+    // Update Interest Amount textbox based on type
+    document.getElementById('loanInterestAmount').value = interestPerPeriod.toFixed(2);
+
     const el = document.getElementById('loanCalcResult');
     if (el) {
         el.innerHTML = `
