@@ -1,0 +1,203 @@
+@page
+@model PANExpenseTracker.Pages.Categories.IndexModel
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">✅ @TempData["SuccessMessage"]</div>
+}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+    <!-- ── EXPENSE CATEGORIES ── -->
+    <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div>
+                <div class="card-title" style="margin:0">💸 Expense Categories</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px">@Model.ExpenseCategories.Count() categories</div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openModal('addExpCatModal')">+ Add</button>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            @foreach (var c in Model.ExpenseCategories)
+            {
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+                    <span style="font-size:20px;width:28px;text-align:center">@(c.Icon ?? "📦")</span>
+                    <span style="flex:1;font-weight:500;font-size:13.5px">@c.Name</span>
+                    <button class="btn btn-outline btn-sm btn-icon"
+                        onclick="openEditExpCatModal(@c.CategoryId,'@c.Name.Replace("'","\\'")', '@c.Icon')">✏️</button>
+                    <form method="post" asp-page-handler="DeleteExpenseCategory" id="del-ecat-@c.CategoryId" style="display:inline">
+                        <input type="hidden" name="id" value="@c.CategoryId" />
+                        @Html.AntiForgeryToken()
+                        <button type="button" class="btn btn-danger btn-sm btn-icon"
+                            onclick="confirmDelete('del-ecat-@c.CategoryId')">🗑️</button>
+                    </form>
+                </div>
+            }
+            @if (!Model.ExpenseCategories.Any())
+            {
+                <div class="empty-state" style="padding:20px 0"><div>No expense categories yet</div></div>
+            }
+        </div>
+    </div>
+
+    <!-- ── INCOME CATEGORIES ── -->
+    <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div>
+                <div class="card-title" style="margin:0">💰 Income Categories</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px">@Model.IncomeCategories.Count() categories</div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openModal('addIncCatModal')">+ Add</button>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            @foreach (var c in Model.IncomeCategories)
+            {
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+                    <span style="font-size:20px;width:28px;text-align:center">@(c.Icon ?? "📦")</span>
+                    <span style="flex:1;font-weight:500;font-size:13.5px">@c.Name</span>
+                    <button class="btn btn-outline btn-sm btn-icon"
+                        onclick="openEditIncCatModal(@c.CategoryId,'@c.Name.Replace("'","\\'")', '@c.Icon')">✏️</button>
+                    <form method="post" asp-page-handler="DeleteIncomeCategory" id="del-icat-@c.CategoryId" style="display:inline">
+                        <input type="hidden" name="id" value="@c.CategoryId" />
+                        @Html.AntiForgeryToken()
+                        <button type="button" class="btn btn-danger btn-sm btn-icon"
+                            onclick="confirmDelete('del-icat-@c.CategoryId')">🗑️</button>
+                    </form>
+                </div>
+            }
+            @if (!Model.IncomeCategories.Any())
+            {
+                <div class="empty-state" style="padding:20px 0"><div>No income categories yet</div></div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ADD EXPENSE CATEGORY MODAL -->
+<div class="modal-overlay" id="addExpCatModal">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-header">
+            <span class="modal-title">💸 Add Expense Category</span>
+            <button class="modal-close" onclick="closeModal('addExpCatModal')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="AddExpenseCategory">
+            @Html.AntiForgeryToken()
+            <div class="form-grid full">
+                <div class="form-group">
+                    <label>Category Name *</label>
+                    <input name="name" required placeholder="e.g. Travel" />
+                </div>
+                <div class="form-group">
+                    <label>Icon (Emoji)</label>
+                    <input name="icon" placeholder="e.g. ✈️" maxlength="10" />
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:16px">
+                <button type="submit" class="btn btn-primary">Add Category</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('addExpCatModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- EDIT EXPENSE CATEGORY MODAL -->
+<div class="modal-overlay" id="editExpCatModal">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-header">
+            <span class="modal-title">✏️ Edit Expense Category</span>
+            <button class="modal-close" onclick="closeModal('editExpCatModal')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="EditExpenseCategory">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="categoryId" id="editExpCatId" />
+            <div class="form-grid full">
+                <div class="form-group">
+                    <label>Category Name *</label>
+                    <input name="name" id="editExpCatName" required />
+                </div>
+                <div class="form-group">
+                    <label>Icon (Emoji)</label>
+                    <input name="icon" id="editExpCatIcon" maxlength="10" />
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:16px">
+                <button type="submit" class="btn btn-primary">Update</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('editExpCatModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ADD INCOME CATEGORY MODAL -->
+<div class="modal-overlay" id="addIncCatModal">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-header">
+            <span class="modal-title">💰 Add Income Category</span>
+            <button class="modal-close" onclick="closeModal('addIncCatModal')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="AddIncomeCategory">
+            @Html.AntiForgeryToken()
+            <div class="form-grid full">
+                <div class="form-group">
+                    <label>Category Name *</label>
+                    <input name="name" required placeholder="e.g. Dividends" />
+                </div>
+                <div class="form-group">
+                    <label>Icon (Emoji)</label>
+                    <input name="icon" placeholder="e.g. 📊" maxlength="10" />
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:16px">
+                <button type="submit" class="btn btn-primary">Add Category</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('addIncCatModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- EDIT INCOME CATEGORY MODAL -->
+<div class="modal-overlay" id="editIncCatModal">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-header">
+            <span class="modal-title">✏️ Edit Income Category</span>
+            <button class="modal-close" onclick="closeModal('editIncCatModal')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="EditIncomeCategory">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="categoryId" id="editIncCatId" />
+            <div class="form-grid full">
+                <div class="form-group">
+                    <label>Category Name *</label>
+                    <input name="name" id="editIncCatName" required />
+                </div>
+                <div class="form-group">
+                    <label>Icon (Emoji)</label>
+                    <input name="icon" id="editIncCatIcon" maxlength="10" />
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:16px">
+                <button type="submit" class="btn btn-primary">Update</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('editIncCatModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function openEditExpCatModal(id, name, icon) {
+    document.getElementById('editExpCatId').value = id;
+    document.getElementById('editExpCatName').value = name;
+    document.getElementById('editExpCatIcon').value = icon || '';
+    openModal('editExpCatModal');
+}
+function openEditIncCatModal(id, name, icon) {
+    document.getElementById('editIncCatId').value = id;
+    document.getElementById('editIncCatName').value = name;
+    document.getElementById('editIncCatIcon').value = icon || '';
+    openModal('editIncCatModal');
+}
+</script>
+}

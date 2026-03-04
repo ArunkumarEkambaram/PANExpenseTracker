@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] – PAN Expense Tracker</title>
+    <link rel="stylesheet" href="~/css/site.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<nav class="sidebar">
+    <div class="sidebar-brand">
+        <span class="brand-icon">₹</span>
+        <span class="brand-text">PAN<em>Tracker</em></span>
+    </div>
+    <ul class="nav-links">
+        <li><a asp-page="/Index" class="@(ViewData["ActivePage"]?.ToString()=="Dashboard"?"active":"")">
+            <span class="nav-icon">⬡</span><span>Dashboard</span></a></li>
+        <li class="nav-divider"><span>MANAGE</span></li>
+        <li><a asp-page="/Loans/Index" class="@(ViewData["ActivePage"]?.ToString()=="Loans"?"active":"")">
+            <span class="nav-icon">🤝</span><span>Loans</span></a></li>
+            <li>
+                <a asp-page="/LoanPayments/Index" class="@(ViewData["ActivePage"]?.ToString() == "LoanPayments" ? "active" : "")">
+                    <span class="nav-icon">💳</span><span>Loan Payments</span>
+                </a>
+            </li>
+        <li><a asp-page="/Expenses/Index" class="@(ViewData["ActivePage"]?.ToString()=="Expenses"?"active":"")">
+            <span class="nav-icon">💸</span><span>Expenses</span></a></li>
+        <li><a asp-page="/Income/Index" class="@(ViewData["ActivePage"]?.ToString()=="Income"?"active":"")">
+            <span class="nav-icon">💰</span><span>Income</span></a></li>
+        <li class="nav-divider"><span>SETTINGS</span></li>
+        <li><a asp-page="/Categories/Index" class="@(ViewData["ActivePage"]?.ToString()=="Categories"?"active":"")">
+            <span class="nav-icon">🏷️</span><span>Categories</span></a></li>
+    </ul>
+    <div class="sidebar-footer">PAN Expense Tracker v1.0</div>
+</nav>
+
+<main class="main-content">
+    <div class="topbar">
+        <h1 class="page-title">@ViewData["Title"]</h1>
+        <div class="topbar-right">
+            <span class="date-badge">@DateTime.Today.ToString("dddd, dd MMM yyyy")</span>
+        </div>
+    </div>
+    <div class="content-area">
+        @RenderBody()
+    </div>
+</main>
+
+<script src="~/js/site.js"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

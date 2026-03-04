@@ -1,0 +1,181 @@
+@page
+@model PANExpenseTracker.Pages.IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+    var s = Model.Summary;
+    var inHandClass = s.AmountInHand >= 0 ? "green" : "red";
+}
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <button class="filter-btn" data-period="day">Today</button>
+    <button class="filter-btn" data-period="week">This Week</button>
+    <button class="filter-btn" data-period="month">This Month</button>
+    <button class="filter-btn" data-period="year">This Year</button>
+    <button class="filter-btn" data-period="all">All Time</button>
+    <span class="filter-sep">|</span>
+    <button class="filter-btn" data-period="custom" onclick="document.getElementById('customRangeRow').style.display='flex'">Custom Range</button>
+</div>
+<div id="customRangeRow" style="display:none;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+    <input type="date" id="customFrom" value="@Model.Filter.From?.ToString("yyyy-MM-dd")" style="width:160px">
+    <span style="color:var(--muted)">to</span>
+    <input type="date" id="customTo" value="@Model.Filter.To?.ToString("yyyy-MM-dd")" style="width:160px">
+    <button class="btn btn-primary btn-sm" id="applyCustomRange">Apply</button>
+</div>
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card @inHandClass">
+        <div class="stat-label">💼 Amount in Hand</div>
+        <div class="stat-value @inHandClass">₹@s.AmountInHand.ToString("N2")</div>
+        <div class="stat-sub">All-time Income − Expenses − Active Loans</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-label">📈 Total Income</div>
+        <div class="stat-value green">₹@s.TotalIncome.ToString("N2")</div>
+        <div class="stat-sub">In selected period</div>
+    </div>
+    <div class="stat-card red">
+        <div class="stat-label">💸 Total Expenses</div>
+        <div class="stat-value red">₹@s.TotalExpenses.ToString("N2")</div>
+        <div class="stat-sub">In selected period</div>
+    </div>
+    <div class="stat-card yellow">
+        <div class="stat-label">🤝 Loans Outstanding</div>
+        <div class="stat-value yellow">₹@s.TotalLoansOutstanding.ToString("N2")</div>
+        <div class="stat-sub">@s.ActiveLoansCount active loan(s)</div>
+    </div>
+</div>
+
+<!-- Second Row Stats -->
+<div class="stat-grid" style="grid-template-columns:1fr 1fr 1fr; margin-bottom:24px;">
+    <div class="stat-card blue">
+        <div class="stat-label">🔥 Monthly Burn Rate</div>
+        <div class="stat-value blue">₹@s.MonthlyBurnRate.ToString("N2")</div>
+        <div class="stat-sub">Avg over last 3 months</div>
+    </div>
+    <div class="stat-card @(s.TotalIncome > 0 ? "green" : "grey")">
+        <div class="stat-label">📊 Savings Rate</div>
+        @{
+            var savingsRate = s.TotalIncome > 0 ? Math.Round((s.TotalIncome - s.TotalExpenses) / s.TotalIncome * 100, 1) : 0;
+        }
+        <div class="stat-value @(savingsRate >= 0 ? "green" : "red")">@savingsRate%</div>
+        <div class="stat-sub">Of income saved this period</div>
+    </div>
+    <div class="stat-card red">
+        <div class="stat-label">⚖️ Expense Ratio</div>
+        @{
+            var expRatio = s.TotalIncome > 0 ? Math.Round(s.TotalExpenses / s.TotalIncome * 100, 1) : 0;
+        }
+        <div class="stat-value red">@expRatio%</div>
+        <div class="stat-sub">Expenses vs income</div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="dashboard-grid">
+    <!-- Monthly Trends -->
+    <div class="card">
+        <div class="card-title">📅 6-Month Trend</div>
+        @if (s.MonthlyTrends.Any())
+        {
+            var maxVal = s.MonthlyTrends.Max(t => Math.Max(t.Income, t.Expenses));
+            <div style="display:flex;align-items:flex-end;gap:12px;height:140px;margin-top:14px;padding-bottom:24px;">
+                @foreach (var t in s.MonthlyTrends)
+                {
+                    var incH = maxVal > 0 ? (int)(t.Income / maxVal * 110) : 0;
+                    var expH = maxVal > 0 ? (int)(t.Expenses / maxVal * 110) : 0;
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                        <div style="display:flex;gap:3px;align-items:flex-end;height:110px;">
+                            <div class="trend-bar-inc" data-height="@(incH)px" style="width:12px;border-radius:3px 3px 0 0;height:0"></div>
+                            <div class="trend-bar-exp" data-height="@(expH)px" style="width:12px;border-radius:3px 3px 0 0;height:0"></div>
+                        </div>
+                        <div class="trend-month">@t.Month.Split(' ')[0]</div>
+                    </div>
+                }
+            </div>
+            <div style="display:flex;gap:16px;margin-top:4px;">
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">
+                    <div style="width:10px;height:10px;background:var(--accent);border-radius:2px"></div>Income
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">
+                    <div style="width:10px;height:10px;background:var(--accent2);border-radius:2px"></div>Expenses
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="empty-state" style="padding:30px 0">
+                <div>No data available yet</div>
+            </div>
+        }
+    </div>
+
+    <!-- Quick Links -->
+    <div class="card">
+        <div class="card-title">⚡ Quick Actions</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">
+            <a asp-page="/Loans/Index" class="btn btn-outline" style="justify-content:center">🤝 Manage Loans</a>
+            <a asp-page="/Expenses/Index" class="btn btn-outline" style="justify-content:center">💸 Track Expenses</a>
+            <a asp-page="/Income/Index" class="btn btn-outline" style="justify-content:center">💰 Record Income</a>
+            <a asp-page="/Categories/Index" class="btn btn-outline" style="justify-content:center">🏷️ Manage Categories</a>
+        </div>
+        @if (s.ActiveLoansCount > 0)
+        {
+            <div style="margin-top:16px;padding:12px;background:rgba(255,209,102,0.08);border:1px solid rgba(255,209,102,0.2);border-radius:8px;font-size:12.5px;color:var(--accent3)">
+                ⚠️ You have <strong>@s.ActiveLoansCount unsettled loan(s)</strong> totalling ₹@s.TotalLoansOutstanding.ToString("N2")
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Breakdown Section -->
+<div class="dashboard-grid" style="margin-top:20px;">
+    <!-- Top Expense Categories -->
+    <div class="card">
+        <div class="card-title">💸 Top Expense Categories</div>
+        @if (s.TopExpenseCategories.Any())
+        {
+            <div class="chart-bar-wrap">
+                @foreach (var c in s.TopExpenseCategories)
+                {
+                    <div class="chart-bar-row">
+                        <div class="chart-bar-label">@c.Icon @c.Category</div>
+                        <div class="chart-bar-track">
+                            <div class="chart-bar-fill" data-width="@c.Percentage%" style="width:0"></div>
+                        </div>
+                        <div class="chart-bar-amount">₹@c.Amount.ToString("N0") <span style="color:var(--muted);font-size:10px">@c.Percentage%</span></div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="empty-state" style="padding:24px 0"><div>No expense data for this period</div></div>
+        }
+    </div>
+
+    <!-- Top Income Categories -->
+    <div class="card">
+        <div class="card-title">💰 Income Sources</div>
+        @if (s.TopIncomeCategories.Any())
+        {
+            <div class="chart-bar-wrap">
+                @foreach (var c in s.TopIncomeCategories)
+                {
+                    <div class="chart-bar-row">
+                        <div class="chart-bar-label">@c.Icon @c.Category</div>
+                        <div class="chart-bar-track">
+                            <div class="chart-bar-fill income" data-width="@c.Percentage%" style="width:0"></div>
+                        </div>
+                        <div class="chart-bar-amount">₹@c.Amount.ToString("N0") <span style="color:var(--muted);font-size:10px">@c.Percentage%</span></div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="empty-state" style="padding:24px 0"><div>No income data for this period</div></div>
+        }
+    </div>
+</div>

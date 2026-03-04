@@ -1,0 +1,293 @@
+@page
+@model PANExpenseTracker.Pages.Loans.IndexModel
+@{
+    var totalActive = Model.Loans.Where(l => !l.IsSettled).Sum(l => l.Amount);
+    var totalInterest = Model.Loans.Where(l => !l.IsSettled).Sum(l => l.TotalInterestDue);
+}
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">✅ @TempData["SuccessMessage"]</div>
+}
+
+<!-- Summary Strip -->
+<div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
+    <div class="stat-card yellow">
+        <div class="stat-label">Active Loans</div>
+        <div class="stat-value yellow">@Model.Loans.Count(l => !l.IsSettled)</div>
+        <div class="stat-sub">Pending settlement</div>
+    </div>
+    <div class="stat-card red">
+        <div class="stat-label">Principal Outstanding</div>
+        <div class="stat-value red">₹@totalActive.ToString("N2")</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-label">Interest Accrued</div>
+        <div class="stat-value blue">₹@totalInterest.ToString("N2")</div>
+    </div>
+</div>
+
+<!-- Filter + Add -->
+<div class="filter-bar">
+    <button class="filter-btn" data-period="day">Today</button>
+    <button class="filter-btn" data-period="week">Week</button>
+    <button class="filter-btn" data-period="month">Month</button>
+    <button class="filter-btn" data-period="year">Year</button>
+    <button class="filter-btn" data-period="all">All</button>
+    <span class="filter-sep">|</span>
+    <button class="filter-btn" data-period="custom" onclick="document.getElementById('customRangeRow').style.display='flex'">Custom</button>
+    <div style="margin-left:auto">
+        <button class="btn btn-primary" onclick="openModal('addLoanModal')">+ Add Loan</button>
+    </div>
+</div>
+<div id="customRangeRow" style="display:none;align-items:center;gap:10px;margin-bottom:16px;">
+    <input type="date" id="customFrom" value="@Model.Filter.From?.ToString("yyyy-MM-dd")" style="width:160px">
+    <span style="color:var(--muted)">to</span>
+    <input type="date" id="customTo" value="@Model.Filter.To?.ToString("yyyy-MM-dd")" style="width:160px">
+    <button class="btn btn-primary btn-sm" id="applyCustomRange">Apply</button>
+</div>
+
+<!-- Table -->
+@if (!Model.Loans.Any())
+{
+    <div class="empty-state">
+        <div class="empty-icon">🤝</div>
+        <h3>No loans found</h3>
+        <p>Add a loan using the button above.</p>
+    </div>
+}
+else
+{
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Mobile</th>
+                    <th>Amount</th>
+                    <th>Given Date</th>
+                    <th>Interest</th>
+                    <th>Total Due</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in Model.Loans)
+                {
+                    <tr class="@(l.IsSettled ? "row-settled" : "")">
+                        <td><span style="color:var(--muted);font-size:12px">@l.LoanId</span></td>
+                        <td>
+                            <div style="font-weight:600">@l.FullName</div>
+                            @if (!string.IsNullOrEmpty(l.Address))
+                            {
+                                <div style="font-size:11px;color:var(--muted)">@l.Address</div>
+                            }
+                        </td>
+                        <td style="font-family:'JetBrains Mono',monospace;font-size:12.5px">@(l.MobileNo ?? "—")</td>
+                        <td class="amount-cell">₹@l.Amount.ToString("N2")</td>
+                        <td style="font-size:13px">@l.GivenDate.ToString("dd MMM yyyy")</td>
+                        <td>
+                            <div style="font-size:12.5px">₹@l.InterestAmount.ToString("N0") / @l.InterestType</div>
+                            @if (l.InterestPaidDate.HasValue)
+                            {
+                                <div style="font-size:11px;color:var(--muted)">Paid: @l.InterestPaidDate.Value.ToString("dd MMM")</div>
+                            }
+                        </td>
+                        <td class="amount-cell" style="color:var(--accent3)">₹@l.TotalRepayable.ToString("N2")</td>
+                        <td>
+                            @if (l.IsSettled)
+                            {
+                                <span class="badge badge-green">✅ Settled</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-yellow">⏳ Active</span>
+                            }
+                        </td>
+                        <td>
+                            <div style="display:flex;gap:6px;flex-wrap:wrap">
+                                <button class="btn btn-outline btn-sm"
+                                    onclick="openEditLoanModal(@l.LoanId,'@l.FullName', '@l.Address','@l.MobileNo','@l.Amount','@l.GivenDate.ToString("yyyy-MM-dd")','@l.InterestType','@l.InterestAmount','@l.InterestPaidDate?.ToString("yyyy-MM-dd")','@l.Notes')">
+                                    ✏️
+                                </button>
+                                @if (!l.IsSettled)
+                                {
+                                    <form method="post" asp-page-handler="Settle" style="display:inline">
+                                        <input type="hidden" name="id" value="@l.LoanId" />
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm" style="background:rgba(0,229,160,0.1);color:var(--accent);border:1px solid rgba(0,229,160,0.3)"
+                                            onclick="return confirm('Mark this loan as settled?')">✅</button>
+                                    </form>
+                                }
+                                <form method="post" asp-page-handler="Delete" style="display:inline" id="del-loan-@l.LoanId">
+                                    <input type="hidden" name="id" value="@l.LoanId" />
+                                    @Html.AntiForgeryToken()
+                                    <button type="button" class="btn btn-danger btn-sm"
+                                        onclick="confirmDelete('del-loan-@l.LoanId')">🗑️</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- ADD LOAN MODAL -->
+<div class="modal-overlay" id="addLoanModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">🤝 Add New Loan</span>
+            <button class="modal-close" onclick="closeModal('addLoanModal')">✕</button>
+        </div>
+        <form method="post" asp-page="/Loans/Upsert">
+            @Html.AntiForgeryToken()
+            <div class="form-grid">
+                <div class="form-group span2">
+                    <label>Full Name *</label>
+                    <input name="FullName" required placeholder="Borrower's full name" />
+                </div>
+                <div class="form-group span2">
+                    <label>Address</label>
+                    <input name="Address" placeholder="Address (optional)" />
+                </div>
+                <div class="form-group">
+                    <label>Mobile No (Optional)</label>
+                    <input name="MobileNo" placeholder="+91 XXXXX XXXXX" />
+                </div>
+                <div class="form-group">
+                    <label>Principal Amount *</label>
+                    <input name="Amount" type="number" step="0.01" min="0" required id="loanAmount"
+                           oninput="calcLoanInterest()" placeholder="₹0.00" />
+                </div>
+                <div class="form-group">
+                    <label>Given Date *</label>
+                    <input name="GivenDate" type="date" required id="loanGivenDate"
+                           value="@DateTime.Today.ToString("yyyy-MM-dd")" oninput="calcLoanInterest()" />
+                </div>
+                <div class="form-group">
+                    <label>Interest Type *</label>
+                    <select name="InterestType" id="loanInterestType" onchange="calcLoanInterest()">
+                        <option value="Monthly">Monthly</option>
+                        <option value="Yearly">Yearly</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Interest Percentage (%) *</label>
+                    <input name="InterestPercentage" type="number" step="0.01" min="0" required id="loanInterestPercentage"
+                           oninput="calcLoanInterest()" placeholder="1.5" />
+                </div>
+                <div class="form-group">
+                    <label>Interest Amount (₹)</label>
+                    <input name="InterestAmount" type="number" step="0.01" min="0" readonly id="loanInterestAmount"
+                           oninput="calcLoanInterest()" placeholder="Per month/year" />
+                </div>
+                <div class="form-group">
+                    <label>Interest Last Paid Date</label>
+                    <input name="InterestPaidDate" type="date" />
+                </div>
+                <div class="form-group span2">
+                    <label>Notes</label>
+                    <textarea name="Notes" placeholder="Any notes…"></textarea>
+                </div>
+            </div>
+            <div id="loanCalcResult"></div>
+            <div class="form-actions" style="margin-top:16px">
+                <button type="submit" class="btn btn-primary">Save Loan</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('addLoanModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- EDIT LOAN MODAL -->
+<div class="modal-overlay" id="editLoanModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">✏️ Edit Loan</span>
+            <button class="modal-close" onclick="closeModal('editLoanModal')">✕</button>
+        </div>
+        <form method="post" asp-page="/Loans/Upsert">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="LoanId" id="editLoanId" />
+            <div class="form-grid">
+                <div class="form-group span2">
+                    <label>Full Name *</label>
+                    <input name="FullName" id="editLoanFullName" required />
+                </div>
+                <div class="form-group span2">
+                    <label>Address</label>
+                    <input name="Address" id="editLoanAddress" />
+                </div>
+                <div class="form-group">
+                    <label>Mobile No</label>
+                    <input name="MobileNo" id="editLoanMobile" />
+                </div>
+                <div class="form-group">
+                    <label>Principal Amount *</label>
+                    <input name="Amount" id="editLoanAmount" type="number" step="0.01" required />
+                </div>
+                <div class="form-group">
+                    <label>Given Date *</label>
+                    <input name="GivenDate" id="editLoanGivenDate" type="date" required />
+                </div>
+                <div class="form-group">
+                    <label>Interest Type *</label>
+                    <select name="InterestType" id="editLoanInterestType">
+                        <option value="Monthly">Monthly</option>
+                        <option value="Yearly">Yearly</option>
+                    </select>
+                </div>
+
+               @*  <div class="form-group">
+                    <label>Interest Percentage (%) *</label>
+                    <input name="InterestPercentage" type="number" step="0.01" min="0" required id="loanInterestPercentage"
+                           oninput="calcLoanInterest()" placeholder="1.5" />
+                </div>
+                <div class="form-group">
+                    <label>Interest Amount (₹)</label>
+                    <input name="InterestAmount" type="number" step="0.01" min="0" required id="loanInterestAmount"
+                           oninput="calcLoanInterest()" placeholder="Per month/year" />
+                </div> *@
+
+                <div class="form-group">
+                    <label>Interest Amount (₹) *</label>
+                    <input name="InterestAmount" id="editLoanInterestAmt" type="number" step="0.01" required />
+                </div>
+                <div class="form-group">
+                    <label>Interest Last Paid Date</label>
+                    <input name="InterestPaidDate" id="editLoanIPDate" type="date" />
+                </div>
+                <div class="form-group span2">
+                    <label>Notes</label>
+                    <textarea name="Notes" id="editLoanNotes"></textarea>
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:16px">
+                <button type="submit" class="btn btn-primary">Update Loan</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('editLoanModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function openEditLoanModal(id, name, address, mobile, amount, givenDate, intType, intAmt, ipDate, notes) {
+    document.getElementById('editLoanId').value = id;
+    document.getElementById('editLoanFullName').value = name || '';
+    document.getElementById('editLoanAddress').value = address || '';
+    document.getElementById('editLoanMobile').value = mobile || '';
+    document.getElementById('editLoanAmount').value = amount;
+    document.getElementById('editLoanGivenDate').value = givenDate;
+    document.getElementById('editLoanInterestType').value = intType;
+    document.getElementById('editLoanInterestAmt').value = intAmt;
+    document.getElementById('editLoanIPDate').value = ipDate || '';
+    document.getElementById('editLoanNotes').value = notes || '';
+    openModal('editLoanModal');
+}
+</script>
+}

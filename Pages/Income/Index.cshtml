@@ -1,0 +1,198 @@
+@page
+@model PANExpenseTracker.Pages.Income.IndexModel
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">✅ @TempData["SuccessMessage"]</div>
+}
+
+<div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
+    <div class="stat-card green">
+        <div class="stat-label">Total Income</div>
+        <div class="stat-value green">₹@Model.TotalAmount.ToString("N2")</div>
+        <div class="stat-sub">In selected period</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-label">No. of Entries</div>
+        <div class="stat-value blue">@Model.IncomeList.Count()</div>
+    </div>
+    <div class="stat-card yellow">
+        <div class="stat-label">Avg per Entry</div>
+        <div class="stat-value yellow">₹@(Model.IncomeList.Any() ? (Model.TotalAmount / Model.IncomeList.Count()).ToString("N2") : "0.00")</div>
+    </div>
+</div>
+
+<div class="filter-bar">
+    <button class="filter-btn" data-period="day">Today</button>
+    <button class="filter-btn" data-period="week">Week</button>
+    <button class="filter-btn" data-period="month">Month</button>
+    <button class="filter-btn" data-period="year">Year</button>
+    <button class="filter-btn" data-period="all">All</button>
+    <span class="filter-sep">|</span>
+    <button class="filter-btn" data-period="custom" onclick="document.getElementById('customRangeRow').style.display='flex'">Custom</button>
+    <div style="margin-left:auto">
+        <button class="btn btn-primary" onclick="openModal('addIncModal')">+ Add Income</button>
+    </div>
+</div>
+<div id="customRangeRow" style="display:none;align-items:center;gap:10px;margin-bottom:16px;">
+    <input type="date" id="customFrom" value="@Model.Filter.From?.ToString("yyyy-MM-dd")" style="width:160px">
+    <span style="color:var(--muted)">to</span>
+    <input type="date" id="customTo" value="@Model.Filter.To?.ToString("yyyy-MM-dd")" style="width:160px">
+    <button class="btn btn-primary btn-sm" id="applyCustomRange">Apply</button>
+</div>
+
+@if (!Model.IncomeList.Any())
+{
+    <div class="empty-state">
+        <div class="empty-icon">💰</div>
+        <h3>No income records found</h3>
+        <p>Record your income using the button above.</p>
+    </div>
+}
+else
+{
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Details</th>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var i in Model.IncomeList)
+                {
+                    <tr>
+                        <td style="font-family:'JetBrains Mono',monospace;font-size:12.5px">@i.IncomeDate.ToString("dd MMM yyyy")</td>
+                        <td style="font-weight:500">@i.Details</td>
+                        <td><span class="badge badge-green">@i.CategoryIcon @i.CategoryName</span></td>
+                        <td class="amount-cell" style="color:var(--accent)">₹@i.Amount.ToString("N2")</td>
+                        <td style="color:var(--muted);font-size:12.5px">@(i.Notes ?? "—")</td>
+                        <td>
+                            <div style="display:flex;gap:6px">
+                                <button class="btn btn-outline btn-sm"
+                                    onclick="openEditIncModal(@i.IncomeId,'@i.IncomeDate.ToString("yyyy-MM-dd")','@i.Details.Replace("'","\\'")',@i.CategoryId,@i.Amount,'@i.Notes?.Replace("'","\\'")')">
+                                    ✏️
+                                </button>
+                                <form method="post" asp-page-handler="Delete" id="del-inc-@i.IncomeId" style="display:inline">
+                                    <input type="hidden" name="id" value="@i.IncomeId" />
+                                    @Html.AntiForgeryToken()
+                                    <button type="button" class="btn btn-danger btn-sm"
+                                        onclick="confirmDelete('del-inc-@i.IncomeId')">🗑️</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- ADD INCOME MODAL -->
+<div class="modal-overlay" id="addIncModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">💰 Add Income</span>
+            <button class="modal-close" onclick="closeModal('addIncModal')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="Add">
+            @Html.AntiForgeryToken()
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Date *</label>
+                    <input name="incomeDate" type="date" required value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="form-group">
+                    <label>Category *</label>
+                    <select name="categoryId" required>
+                        <option value="">-- Select --</option>
+                        @foreach (var c in Model.Categories)
+                        {
+                            <option value="@c.CategoryId">@c.Icon @c.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group span2">
+                    <label>Details *</label>
+                    <input name="details" required placeholder="Source or description of income" />
+                </div>
+                <div class="form-group">
+                    <label>Amount (₹) *</label>
+                    <input name="amount" type="number" step="0.01" min="0" required placeholder="0.00" />
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <input name="notes" placeholder="Optional notes" />
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:16px">
+                <button type="submit" class="btn btn-primary">Save Income</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('addIncModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- EDIT INCOME MODAL -->
+<div class="modal-overlay" id="editIncModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">✏️ Edit Income</span>
+            <button class="modal-close" onclick="closeModal('editIncModal')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="Edit">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="incomeId" id="editIncId" />
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Date *</label>
+                    <input name="incomeDate" id="editIncDate" type="date" required />
+                </div>
+                <div class="form-group">
+                    <label>Category *</label>
+                    <select name="categoryId" id="editIncCat" required>
+                        @foreach (var c in Model.Categories)
+                        {
+                            <option value="@c.CategoryId">@c.Icon @c.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group span2">
+                    <label>Details *</label>
+                    <input name="details" id="editIncDetails" required />
+                </div>
+                <div class="form-group">
+                    <label>Amount (₹) *</label>
+                    <input name="amount" id="editIncAmount" type="number" step="0.01" required />
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <input name="notes" id="editIncNotes" />
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:16px">
+                <button type="submit" class="btn btn-primary">Update Income</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('editIncModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function openEditIncModal(id, date, details, catId, amount, notes) {
+    document.getElementById('editIncId').value = id;
+    document.getElementById('editIncDate').value = date;
+    document.getElementById('editIncDetails').value = details;
+    document.getElementById('editIncCat').value = catId;
+    document.getElementById('editIncAmount').value = amount;
+    document.getElementById('editIncNotes').value = notes || '';
+    openModal('editIncModal');
+}
+</script>
+}

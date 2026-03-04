@@ -1,0 +1,259 @@
+﻿@page
+@model PANExpenseTracker.Pages.LoanPayments.IndexModel
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">✅ @TempData["SuccessMessage"]</div>
+}
+
+<!-- Summary Strip -->
+<div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
+    <div class="stat-card green">
+        <div class="stat-label">Total Collected</div>
+        <div class="stat-value green">₹@Model.TotalCollected.ToString("N2")</div>
+        <div class="stat-sub">In selected period</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-label">No. of Payments</div>
+        <div class="stat-value blue">@Model.Payments.Count()</div>
+    </div>
+    <div class="stat-card yellow">
+        <div class="stat-label">Active Loans</div>
+        <div class="stat-value yellow">@Model.ActiveLoans.Count(l => !l.IsSettled)</div>
+        <div class="stat-sub">Unsettled</div>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <button class="filter-btn" data-period="day">Today</button>
+    <button class="filter-btn" data-period="week">Week</button>
+    <button class="filter-btn" data-period="month">Month</button>
+    <button class="filter-btn" data-period="year">Year</button>
+    <button class="filter-btn" data-period="all">All</button>
+    <span class="filter-sep">|</span>
+    <button class="filter-btn" data-period="custom"
+        onclick="document.getElementById('customRangeRow').style.display='flex'">Custom</button>
+    <div style="margin-left:auto">
+        <button class="btn btn-primary" onclick="openModal('addPayModal')">+ Record Payment</button>
+    </div>
+</div>
+<div id="customRangeRow" style="display:none;align-items:center;gap:10px;margin-bottom:16px;">
+    <input type="date" id="customFrom" value="@Model.Filter.From?.ToString("yyyy-MM-dd")" style="width:160px">
+    <span style="color:var(--muted)">to</span>
+    <input type="date" id="customTo" value="@Model.Filter.To?.ToString("yyyy-MM-dd")" style="width:160px">
+    <button class="btn btn-primary btn-sm" id="applyCustomRange">Apply</button>
+</div>
+
+<!-- Borrower Filter -->
+<div style="margin-bottom:18px;display:flex;align-items:center;gap:10px;">
+    <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;">Filter by Borrower:</label>
+    <select id="loanFilter" onchange="applyLoanFilter()" style="width:220px;">
+        <option value="">All Borrowers</option>
+        @foreach (var l in Model.ActiveLoans)
+        {
+            @if (Model.SelectedLoanId == l.LoanId)
+            {
+                <option value="@l.LoanId" selected>@l.FullName — ₹@l.Amount.ToString("N0")</option>
+            }
+            else
+            {
+                <option value="@l.LoanId">@l.FullName — ₹@l.Amount.ToString("N0")</option>
+            }
+        }
+    </select>
+</div>
+
+<!-- Table -->
+@if (!Model.Payments.Any())
+{
+    <div class="empty-state">
+        <div class="empty-icon">💳</div>
+        <h3>No payments found</h3>
+        <p>Record an interest payment using the button above.</p>
+    </div>
+}
+else
+{
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Borrower</th>
+                    <th>Amount Paid</th>
+                    <th>Mode</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.Payments)
+                {
+                    <tr>
+                        <td style="font-family:'JetBrains Mono',monospace;font-size:12.5px">
+                            @p.PaymentDate.ToString("dd MMM yyyy")
+                        </td>
+                        <td style="font-weight:600">@p.BorrowerName</td>
+                        <td class="amount-cell" style="color:var(--accent)">₹@p.AmountPaid.ToString("N2")</td>
+                        <td>
+                            <span class="badge @(p.PaymentMode=="Cash"?"badge-green":p.PaymentMode=="UPI"?"badge-blue":"badge-yellow")">
+                                @p.PaymentMode
+                            </span>
+                        </td>
+                        <td style="color:var(--muted);font-size:12.5px">@(p.Notes ?? "—")</td>
+                        <td>
+                            <div style="display:flex;gap:6px">
+                                <button class="btn btn-outline btn-sm"
+                                    onclick="openEditPayModal(@p.PaymentId,@p.LoanId,'@p.PaymentDate.ToString("yyyy-MM-dd")',@p.AmountPaid,'@p.PaymentMode','@p.Notes?.Replace("'","\\'")' )">
+                                    ✏️
+                                </button>
+                                <form method="post" asp-page-handler="Delete" id="del-pay-@p.PaymentId" style="display:inline">
+                                    <input type="hidden" name="id" value="@p.PaymentId" />
+                                    @Html.AntiForgeryToken()
+                                    <button type="button" class="btn btn-danger btn-sm"
+                                        onclick="confirmDelete('del-pay-@p.PaymentId')">🗑️</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- ADD PAYMENT MODAL -->
+<div class="modal-overlay" id="addPayModal">
+    <div class="modal" style="max-width:500px">
+        <div class="modal-header">
+            <span class="modal-title">💳 Record Interest Payment</span>
+            <button class="modal-close" onclick="closeModal('addPayModal')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="Add">
+            @Html.AntiForgeryToken()
+            <div class="form-grid">
+                <div class="form-group span2">
+                    <label>Borrower (Loan) *</label>
+                    <select name="loanId" id="addLoanSelect" required onchange="fillInterestAmount()">
+                        <option value="">-- Select Borrower --</option>
+                        @foreach (var l in Model.ActiveLoans.Where(l => !l.IsSettled))
+                        {
+                            <option value="@l.LoanId"
+                                data-interest="@l.InterestAmount"
+                                data-type="@l.InterestType">
+                                @l.FullName — ₹@l.Amount.ToString("N0") (@l.InterestType)
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Payment Date *</label>
+                    <input name="paymentDate" type="date" required value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="form-group">
+                    <label>Amount Paid (₹) *</label>
+                    <input name="amountPaid" id="addAmountPaid" type="number" step="0.01" min="0" required placeholder="0.00" />
+                </div>
+                <div class="form-group">
+                    <label>Payment Mode *</label>
+                    <select name="paymentMode">
+                        <option value="Cash">Cash</option>
+                        <option value="UPI">UPI</option>
+                        <option value="Bank">Bank</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <input name="notes" placeholder="Optional notes" />
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:16px">
+                <button type="submit" class="btn btn-primary">Save Payment</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('addPayModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- EDIT PAYMENT MODAL -->
+<div class="modal-overlay" id="editPayModal">
+    <div class="modal" style="max-width:500px">
+        <div class="modal-header">
+            <span class="modal-title">✏️ Edit Payment</span>
+            <button class="modal-close" onclick="closeModal('editPayModal')">✕</button>
+        </div>
+        <form method="post" asp-page-handler="Edit">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="paymentId" id="editPayId" />
+            <div class="form-grid">
+                <div class="form-group span2">
+                    <label>Borrower (Loan) *</label>
+                    <select name="loanId" id="editLoanSelect" required>
+                        @foreach (var l in Model.ActiveLoans)
+                        {
+                            <option value="@l.LoanId"
+                                data-interest="@l.InterestAmount"
+                                data-type="@l.InterestType">
+                                @l.FullName — ₹@l.Amount.ToString("N0") (@l.InterestType)
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Payment Date *</label>
+                    <input name="paymentDate" id="editPayDate" type="date" required />
+                </div>
+                <div class="form-group">
+                    <label>Amount Paid (₹) *</label>
+                    <input name="amountPaid" id="editAmountPaid" type="number" step="0.01" required />
+                </div>
+                <div class="form-group">
+                    <label>Payment Mode *</label>
+                    <select name="paymentMode" id="editPayMode">
+                        <option value="Cash">Cash</option>
+                        <option value="UPI">UPI</option>
+                        <option value="Bank">Bank</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <input name="notes" id="editPayNotes" />
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:16px">
+                <button type="submit" class="btn btn-primary">Update Payment</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('editPayModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function fillInterestAmount() {
+    const sel = document.getElementById('addLoanSelect');
+    const opt = sel.options[sel.selectedIndex];
+    const interest = opt?.dataset.interest || '';
+    document.getElementById('addAmountPaid').value = interest ? parseFloat(interest).toFixed(2) : '';
+}
+
+function applyLoanFilter() {
+    const loanId = document.getElementById('loanFilter').value;
+    const url = new URL(window.location.href);
+    if (loanId) url.searchParams.set('loanId', loanId);
+    else url.searchParams.delete('loanId');
+    window.location.href = url.toString();
+}
+
+function openEditPayModal(id, loanId, date, amount, mode, notes) {
+    document.getElementById('editPayId').value = id;
+    document.getElementById('editLoanSelect').value = loanId;
+    document.getElementById('editPayDate').value = date;
+    document.getElementById('editAmountPaid').value = amount;
+    document.getElementById('editPayMode').value = mode;
+    document.getElementById('editPayNotes').value = notes || '';
+    openModal('editPayModal');
+}
+</script>
+}
