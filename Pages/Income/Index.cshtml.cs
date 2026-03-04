@@ -9,13 +9,16 @@ public class IndexModel : PageModel
 {
     private readonly IIncomeRepository _repo;
     private readonly ICategoryRepository _cat;
-    public IndexModel(IIncomeRepository repo, ICategoryRepository cat)
-    { _repo = repo; _cat = cat; }
+    private readonly ILoanInterestPaymentRepository _loanPayments;
+
+    public IndexModel(IIncomeRepository repo, ICategoryRepository cat, ILoanInterestPaymentRepository loanPayments)
+    { _repo = repo; _cat = cat; _loanPayments = loanPayments; }
 
     public IEnumerable<PANExpenseTracker.Models.Income> IncomeList { get; set; } = [];
     public IEnumerable<IncomeCategory> Categories { get; set; } = [];
     public DateFilter Filter { get; set; } = new();
     public decimal TotalAmount { get; set; }
+    public decimal LoanPaymentsTotal { get; set; }
 
     [TempData] public string? SuccessMessage { get; set; }
 
@@ -27,6 +30,8 @@ public class IndexModel : PageModel
         IncomeList = await _repo.GetAllAsync(Filter);
         Categories = await _cat.GetIncomeCategoriesAsync();
         TotalAmount = IncomeList.Sum(i => i.Amount);
+        var payments = await _loanPayments.GetAllAsync(Filter);
+        LoanPaymentsTotal = payments.Sum(p => p.AmountPaid);
     }
 
     public async Task<IActionResult> OnPostAddAsync(

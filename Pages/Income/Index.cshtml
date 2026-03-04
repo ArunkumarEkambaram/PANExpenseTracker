@@ -17,8 +17,9 @@
         <div class="stat-value blue">@Model.IncomeList.Count()</div>
     </div>
     <div class="stat-card yellow">
-        <div class="stat-label">Avg per Entry</div>
-        <div class="stat-value yellow">₹@(Model.IncomeList.Any() ? (Model.TotalAmount / Model.IncomeList.Count()).ToString("N2") : "0.00")</div>
+        <div class="stat-label">Loan Payments</div>
+        <div class="stat-value yellow">₹@Model.LoanPaymentsTotal.ToString("N2")</div>
+        <div class="stat-sub">Interest collected this period</div>
     </div>
 </div>
 
