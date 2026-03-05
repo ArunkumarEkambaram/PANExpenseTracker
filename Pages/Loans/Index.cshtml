@@ -147,20 +147,23 @@ else
 
                         <!-- Actions -->
                         <td>
-                            <div style="display:flex;gap:6px;flex-wrap:wrap">
-                                <button class="btn btn-outline btn-sm"
-                                        onclick="openEditLoanModal(@l.LoanId,'@l.FullName.Replace("'", "\\'")', '@l.Address','@l.MobileNo','@l.Amount','@l.GivenDate.ToString("yyyy-MM-dd")','@l.InterestType','@l.InterestAmount','@l.InterestPercentage','@l.InterestPaidDate?.ToString("yyyy-MM-dd")','@l.Notes')">
-                                    ✏️
-                                </button>
-                                <form method="post" asp-page-handler="Delete" style="display:inline" id="del-loan-@l.LoanId">
-                                    <input type="hidden" name="id" value="@l.LoanId" />
-                                    @Html.AntiForgeryToken()
-                                    <button type="button" class="btn btn-danger btn-sm"
-                                            onclick="confirmDelete('del-loan-@l.LoanId')">
-                                        🗑️
+                            @if (!l.IsSettled)
+                            {
+                                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                                    <button class="btn btn-outline btn-sm"
+                                            onclick="openEditLoanModal(@l.LoanId,'@l.FullName.Replace("'", "\\'")', '@l.Address','@l.MobileNo','@l.Amount','@l.GivenDate.ToString("yyyy-MM-dd")','@l.InterestType','@l.InterestAmount','@l.InterestPercentage','@l.InterestPaidDate?.ToString("yyyy-MM-dd")','@l.Notes')">
+                                        ✏️
                                     </button>
-                                </form>
-                            </div>
+                                    <form method="post" asp-page-handler="Delete" style="display:inline" id="del-loan-@l.LoanId">
+                                        <input type="hidden" name="id" value="@l.LoanId" />
+                                        @Html.AntiForgeryToken()
+                                        <button type="button" class="btn btn-danger btn-sm"
+                                                onclick="confirmDelete('del-loan-@l.LoanId')">
+                                            🗑️
+                                        </button>
+                                    </form>
+                                </div>
+                            }
                         </td>
                     </tr>
                 }
@@ -275,7 +278,7 @@ else
                     </select>
                 </div>
 
-               @*  <div class="form-group">
+                @*  <div class="form-group">
                     <label>Interest Percentage (%) *</label>
                     <input name="InterestPercentage" type="number" step="0.01" min="0" required id="loanInterestPercentage"
                            oninput="calcLoanInterest()" placeholder="1.5" />
@@ -308,19 +311,19 @@ else
 </div>
 
 @section Scripts {
-<script>
-function openEditLoanModal(id, name, address, mobile, amount, givenDate, intType, intAmt, ipDate, notes) {
-    document.getElementById('editLoanId').value = id;
-    document.getElementById('editLoanFullName').value = name || '';
-    document.getElementById('editLoanAddress').value = address || '';
-    document.getElementById('editLoanMobile').value = mobile || '';
-    document.getElementById('editLoanAmount').value = amount;
-    document.getElementById('editLoanGivenDate').value = givenDate;
-    document.getElementById('editLoanInterestType').value = intType;
-    document.getElementById('editLoanInterestAmt').value = intAmt;
-    document.getElementById('editLoanIPDate').value = ipDate || '';
-    document.getElementById('editLoanNotes').value = notes || '';
-    openModal('editLoanModal');
-}
-</script>
+    <script>
+        function openEditLoanModal(id, name, address, mobile, amount, givenDate, intType, intAmt, ipDate, notes) {
+            document.getElementById('editLoanId').value = id;
+            document.getElementById('editLoanFullName').value = name || '';
+            document.getElementById('editLoanAddress').value = address || '';
+            document.getElementById('editLoanMobile').value = mobile || '';
+            document.getElementById('editLoanAmount').value = amount;
+            document.getElementById('editLoanGivenDate').value = givenDate;
+            document.getElementById('editLoanInterestType').value = intType;
+            document.getElementById('editLoanInterestAmt').value = intAmt;
+            document.getElementById('editLoanIPDate').value = ipDate || '';
+            document.getElementById('editLoanNotes').value = notes || '';
+            openModal('editLoanModal');
+        }
+    </script>
 }
